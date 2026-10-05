@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SquatMotion AI - Análisis Biomecánico</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome CDN for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-full flex flex-col overflow-x-hidden">
+
+    <!-- Header / Navbar -->
+    <header class="bg-slate-800 border-b border-slate-700 py-3 px-6 flex justify-between items-center shadow-md">
+        <div class="flex items-center space-x-3">
+            <div class="bg-emerald-600 text-white p-2 rounded-xl shadow-inner flex items-center justify-center">
+                <i class="fa-solid fa-eye text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight text-white">SquatMotion AI</h1>
+                <p class="text-xs text-slate-400">Análisis Biomecánico - Calibración HSV Alta Precisión</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Calidad Original</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto">
+        
+        <!-- Left Column: Video Feed & Controls -->
+        <div class="lg:col-span-7 flex flex-col space-y-4">
+            
+            <!-- Canvas / Video Display Area -->
+            <div class="relative bg-black rounded-2xl overflow-hidden shadow-2xl border border-slate-700 flex items-center justify-center max-h-[70vh] min-h-[300px]">
+                <video id="sample_video" class="hidden" crossorigin="anonymous" loop muted playsinline></video>
+                <canvas id="output_canvas" class="max-w-full max-h-[70vh] w-auto h-auto object-contain"></canvas>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 shadow-lg flex flex-col space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2">
+                        <button onclick="document.getElementById('video-upload-input').click()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center space-x-2">
+                            <i class="fa-solid fa-file-video"></i>
+                            <span id="file-name-label">Seleccionar Video</span>
+                        </button>
+                        <input type="file" id="video-upload-input" accept="video/*" class="hidden">
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <button id="btn-start" onclick="startAnalysis()" disabled class="bg-slate-700 text-slate-400 px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center space-x-2 cursor-not-allowed">
+                            <i class="fa-solid fa-play"></i>
+                            <span>Iniciar</span>
+                        </button>
+                        <button id="btn-stop" onclick="stopAnalysis()" disabled class="bg-slate-700 text-slate-400 px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center space-x-2 cursor-not-allowed">
+                            <i class="fa-solid fa-stop"></i>
+                            <span>Detener</span>
+                        </button>
+                        <button onclick="resetMetrics()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-xl text-sm font-semibold transition" title="Reiniciar Repeticiones">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sliders and Settings -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-700/60">
+                    <div class="bg-slate-900/60 rounded-xl p-3 border border-slate-700/50 flex flex-col justify-center">
+                        <span class="text-xs text-slate-400 font-medium">Color del Marcador</span>
+                        <select id="marker-color-select" onchange="updateMarkerColor(this.value)" class="mt-1 bg-slate-900 border border-slate-600 text-slate-200 text-xs rounded px-2 py-1 focus:ring-1 focus:ring-emerald-500 outline-none">
+                            <option value="green" selected>Verde Neón</option>
+                            <option value="red">Rojo / Naranja</option>
+                            <option value="blue">Azul / Cyan</option>
+                            <option value="yellow">Amarillo</option>
+                            <option value="magenta">Rosa / Magenta</option>
+                            <option value="white">Blanco (Contraste)</option>
+                        </select>
+                    </div>
+                    <div class="bg-slate-900/60 rounded-xl p-3 border border-slate-700/50 flex flex-col justify-center">
+                        <span class="text-xs text-slate-400 font-medium">Sensibilidad Color</span>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <input type="range" id="sensitivity-slider" min="5" max="40" value="20" class="w-full accent-emerald-500" oninput="updateSensitivity(this.value)">
+                            <span id="sensitivity-val" class="text-sm font-bold text-emerald-400 w-8">20</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/60 rounded-xl p-3 border border-slate-700/50 flex flex-col justify-center">
+                        <span class="text-xs text-slate-400 font-medium">Umbral Sentadilla</span>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <input type="range" id="threshold-slider" min="70" max="110" value="90" class="w-full accent-emerald-500" oninput="updateThreshold(this.value)">
+                            <span id="threshold-val" class="text-sm font-bold text-emerald-400 w-8">90°</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Metrics & Visualizations -->
+        <div class="lg:col-span-5 flex flex-col space-y-4">
+            
+            <!-- Primary Live Angle Display -->
+            <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 shadow-lg flex items-center justify-between">
+                <div>
+                    <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Ángulo Actual</span>
+                    <div class="flex items-baseline space-x-1 mt-1">
+                        <span id="side-angle-display" class="text-4xl font-black text-emerald-400">0</span>
+                        <span class="text-lg text-emerald-300 font-bold">°</span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Fase</span>
+                    <p id="current-phase" class="text-sm font-bold text-slate-200 mt-1 uppercase">Esperando Video</p>
+                </div>
+            </div>
+
+            <!-- Feedback Banner -->
+            <div id="feedback-banner" class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 shadow-lg text-center transition-all duration-300">
+                <p id="feedback-text" class="text-xs font-semibold text-slate-300">Cargue un archivo de video para comenzar la evaluación.</p>
+            </div>
+
+            <!-- Metrics Cards Grid -->
+            <div class="grid grid-cols-3 gap-3">
+                <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-3 shadow-lg flex flex-col justify-between">
+                    <span class="text-slate-400 text-[11px] font-medium">Repeticiones</span>
+                    <div class="my-1">
+                        <span id="rep-count" class="text-2xl font-black text-white">0</span>
+                    </div>
+                    <span class="text-[9px] text-slate-400">Completadas</span>
+                </div>
+
+                <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-3 shadow-lg flex flex-col justify-between">
+                    <span class="text-slate-400 text-[11px] font-medium">Flexión Máx.</span>
+                    <div class="my-1">
+                        <span id="min-angle-val" class="text-2xl font-black text-cyan-400">--</span>
+                        <span class="text-xs text-cyan-300 font-bold">°</span>
+                    </div>
+                    <span class="text-[9px] text-slate-400">Mínimo Ángulo</span>
+                </div>
+
+                <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-3 shadow-lg flex flex-col justify-between">
+                    <span class="text-slate-400 text-[11px] font-medium">Extensión</span>
+                    <div class="my-1">
+                        <span id="max-angle-val" class="text-2xl font-black text-amber-400">--</span>
+                        <span class="text-xs text-amber-300 font-bold">°</span>
+                    </div>
+                    <span class="text-[9px] text-slate-400">Máximo Ángulo</span>
+                </div>
+            </div>
+
+            <!-- Real-time Chart -->
+            <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-4 shadow-lg flex flex-col flex-1 min-h-[220px]">
+                <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-700">
+                    <h3 class="text-xs font-bold text-slate-200">Evolución del Ángulo de Rodilla</h3>
+                </div>
+                <div class="relative flex-1 w-full min-h-[160px]">
+                    <canvas id="angleChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Session Console / Log -->
+            <div class="bg-slate-800/90 border border-slate-700 rounded-2xl p-3 shadow-lg flex flex-col max-h-[120px]">
+                <div id="session-log" class="flex-1 overflow-y-auto space-y-1 text-[11px] text-slate-300 font-mono">
+                    <p class="text-slate-500 italic">[00:00] Seleccione un archivo de video.</p>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- JavaScript Engine -->
+    <script>
+        let isRunning = false;
+        let animationFrameId = null;
+        let squatThreshold = 90;
+        let colorSensitivity = 20;
+        let selectedMarkerColor = 'green';
+        let hasVideoLoaded = false;
+
+        let repCount = 0;
+        let currentPhase = 'up';
+        let minAngleInRep = 180;
+        let maxAngleInRep = 0;
+        let currentAngle = 180;
+
+        const sampleVideoElement = document.getElementById('sample_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d', { willReadFrequently: true });
+        const videoUploadInput = document.getElementById('video-upload-input');
+        
+        let angleChart = null;
+        const maxDataPoints = 40;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            setupFileInput();
+        });
+
+        function logMessage(msg) {
+            const logContainer = document.getElementById('session-log');
+            const timeStr = new Date().toLocaleTimeString();
+            const p = document.createElement('p');
+            p.textContent = `[${timeStr}] ${msg}`;
+            logContainer.prepend(p);
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('angleChart').getContext('2d');
+            angleChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array(maxDataPoints).fill(''),
+                    datasets: [{
+                        label: 'Ángulo Rodilla (°)',
+                        data: Array(maxDataPoints).fill(180),
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    scales: {
+                        y: {
+                            min: 40,
+                            max: 190,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#94a3b8', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { display: false }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function updateChartData(angle) {
+            if (!angleChart) return;
+            const data = angleChart.data.datasets[0].data;
+            data.shift();
+            data.push(angle);
+            angleChart.update('none');
+        }
+
+        function setupFileInput() {
+            videoUploadInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (isRunning) stopAnalysis();
+                    const fileURL = URL.createObjectURL(file);
+                    sampleVideoElement.src = fileURL;
+                    hasVideoLoaded = true;
+
+                    sampleVideoElement.onloadedmetadata = () => {
+                        canvasElement.width = sampleVideoElement.videoWidth;
+                        canvasElement.height = sampleVideoElement.videoHeight;
+                    };
+                    
+                    document.getElementById('file-name-label').textContent = file.name.substring(0, 15) + '...';
+                    
+                    const btnStart = document.getElementById('btn-start');
+                    btnStart.disabled = false;
+                    btnStart.className = 'bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center space-x-2 shadow-lg shadow-emerald-600/30';
+
+                    logMessage(`Archivo cargado: ${file.name}`);
+                    updateFeedback('Video listo. Haga clic en Iniciar para analizar.', 'border-emerald-500/50 text-emerald-300');
+                }
+            });
+        }
+
+        function updateMarkerColor(color) {
+            selectedMarkerColor = color;
+            logMessage(`Color de marcador: ${color}`);
+        }
+
+        function updateSensitivity(val) {
+            colorSensitivity = parseInt(val);
+            document.getElementById('sensitivity-val').textContent = val;
+        }
+
+        function updateThreshold(val) {
+            squatThreshold = parseInt(val);
+            document.getElementById('threshold-val').textContent = val + '°';
+        }
+
+        function resetMetrics() {
+            repCount = 0;
+            minAngleInRep = 180;
+            maxAngleInRep = 0;
+            document.getElementById('rep-count').textContent = '0';
+            document.getElementById('min-angle-val').textContent = '--';
+            document.getElementById('max-angle-val').textContent = '--';
+            logMessage('Métricas reiniciadas.');
+        }
+
+        function startAnalysis() {
+            if (isRunning || !hasVideoLoaded) return;
+            isRunning = true;
+            
+            document.getElementById('btn-start').disabled = true;
+            document.getElementById('btn-start').className = 'bg-slate-700 text-slate-400 px-4 py-2 rounded-xl text-sm font-semibold transition cursor-not-allowed';
+            
+            const btnStop = document.getElementById('btn-stop');
+            btnStop.disabled = false;
+            btnStop.className = 'bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center space-x-2 shadow-lg shadow-rose-600/30';
+
+            sampleVideoElement.play();
+            logMessage('Procesando video...');
+            processLoop();
+        }
+
+        function stopAnalysis() {
+            if (!isRunning) return;
+            isRunning = false;
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            sampleVideoElement.pause();
+
+            const btnStart = document.getElementById('btn-start');
+            btnStart.disabled = false;
+            btnStart.className = 'bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center space-x-2 shadow-lg shadow-emerald-600/30';
+            
+            const btnStop = document.getElementById('btn-stop');
+            btnStop.disabled = true;
+            btnStop.className = 'bg-slate-700 text-slate-400 px-4 py-2 rounded-xl text-sm font-semibold transition cursor-not-allowed';
+
+            updateFeedback('Análisis detenido.', 'border-slate-700 text-slate-300');
+            logMessage('Análisis detenido.');
+        }
+
+        function processLoop() {
+            if (!isRunning) return;
+
+            if (sampleVideoElement.readyState >= 2) {
+                const width = sampleVideoElement.videoWidth;
+                const height = sampleVideoElement.videoHeight;
+
+                if (canvasElement.width !== width || canvasElement.height !== height) {
+                    canvasElement.width = width;
+                    canvasElement.height = height;
+                }
+
+                canvasCtx.drawImage(sampleVideoElement, 0, 0, width, height);
+                const frameData = canvasCtx.getImageData(0, 0, width, height);
+                
+                const markers = detectColorMarkers(frameData, width, height);
+
+                if (markers.length >= 3) {
+                    markers.sort((a, b) => a.y - b.y);
+
+                    const hipPt = markers[0];
+                    const kneePt = markers[1];
+                    const anklePt = markers[2];
+
+                    currentAngle = calculateAngle(hipPt, kneePt, anklePt);
+
+                    document.getElementById('side-angle-display').textContent = currentAngle;
+                    updateChartData(currentAngle);
+
+                    if (currentAngle < minAngleInRep) minAngleInRep = currentAngle;
+                    if (currentAngle > maxAngleInRep) maxAngleInRep = currentAngle;
+
+                    document.getElementById('min-angle-val').textContent = minAngleInRep === 180 ? '--' : minAngleInRep;
+                    document.getElementById('max-angle-val').textContent = maxAngleInRep === 0 ? '--' : maxAngleInRep;
+
+                    if (currentAngle > 150) {
+                        currentPhase = 'up';
+                        document.getElementById('current-phase').textContent = 'Extendido';
+                        updateFeedback('Marcadores detectados. Inicie la bajada.', 'border-emerald-500/50 text-emerald-300');
+                    } else if (currentAngle <= squatThreshold) {
+                        if (currentPhase === 'up') {
+                            currentPhase = 'down';
+                            repCount++;
+                            document.getElementById('rep-count').textContent = repCount;
+                            logMessage(`¡Repetición #${repCount}! Ángulo mín: ${minAngleInRep}°`);
+                        }
+                        document.getElementById('current-phase').textContent = 'Flexión Máxima';
+                        updateFeedback('¡Profundidad alcanzada!', 'border-emerald-500/50 text-emerald-300');
+                        minAngleInRep = 180;
+                    } else {
+                        document.getElementById('current-phase').textContent = currentPhase === 'down' ? 'Subiendo...' : 'Bajando...';
+                        updateFeedback('Realizando movimiento...', 'border-slate-700 text-slate-200');
+                    }
+
+                    // Renderizar esqueleto cinemático
+                    drawSkeletonLine(hipPt, kneePt, '#10b981', 4);
+                    drawSkeletonLine(kneePt, anklePt, '#10b981', 4);
+
+                    // Renderizar puntos articulares
+                    drawJointPoint(hipPt, '#34d399');
+                    drawJointPoint(kneePt, '#f43f5e', 8);
+                    drawJointPoint(anklePt, '#34d399');
+
+                    // Renderizar el texto del ángulo
+                    drawAngleText(kneePt, `${currentAngle}°`);
+
+                } else {
+                    updateFeedback(`Buscando marcadores (${markers.length}/3). Ajuste la sensibilidad.`, 'border-amber-500/50 text-amber-300');
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(processLoop);
+        }
+
+        function detectColorMarkers(imageData, width, height) {
+            const data = imageData.data;
+            const points = [];
+            const step = 4;
+
+            for (let y = 0; y < height; y += step) {
+                for (let x = 0; x < width; x += step) {
+                    const idx = (y * width + x) * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+
+                    if (isTargetColorHSV(r, g, b, selectedMarkerColor, colorSensitivity)) {
+                        points.push({ x, y });
+                    }
+                }
+            }
+
+            return getTop3Clusters(points);
+        }
+
+        function rgbToHsv(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, v = max;
+            const d = max - min;
+            s = max === 0 ? 0 : d / max;
+
+            if (max === min) {
+                h = 0;
+            } else {
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+
+            return {
+                h: Math.round(h * 360),
+                s: Math.round(s * 100),
+                v: Math.round(v * 100)
+            };
+        }
+
+        function isTargetColorHSV(r, g, b, targetColor, tol) {
+            const hsv = rgbToHsv(r, g, b);
+
+            switch (targetColor) {
+                case 'green':
+                    return (hsv.h >= 120 - tol * 1.5 && hsv.h <= 120 + tol * 1.5) && hsv.s >= 35 && hsv.v >= 30;
+
+                case 'red':
+                    const isRedHue = (hsv.h <= tol || hsv.h >= (360 - tol));
+                    return isRedHue && hsv.s >= 40 && hsv.v >= 30;
+
+                case 'blue':
+                    return (hsv.h >= 200 - tol * 1.5 && hsv.h <= 220 + tol * 1.5) && hsv.s >= 35 && hsv.v >= 30;
+
+                case 'yellow':
+                    return (hsv.h >= 55 - tol && hsv.h <= 60 + tol) && hsv.s >= 40 && hsv.v >= 40;
+
+                case 'magenta':
+                    return (hsv.h >= 300 - tol && hsv.h <= 320 + tol) && hsv.s >= 35 && hsv.v >= 30;
+
+                case 'white':
+                    return hsv.s <= (20 + tol/2) && hsv.v >= (75 - tol);
+
+                default:
+                    return (hsv.h >= 120 - tol && hsv.h <= 120 + tol) && hsv.s >= 35 && hsv.v >= 30;
+            }
+        }
+
+        function getTop3Clusters(points) {
+            if (points.length < 10) return [];
+
+            let centroids = [
+                { x: points[0].x, y: points[0].y },
+                { x: points[Math.floor(points.length / 2)].x, y: points[Math.floor(points.length / 2)].y },
+                { x: points[points.length - 1].x, y: points[points.length - 1].y }
+            ];
+
+            for (let iter = 0; iter < 5; iter++) {
+                const clusters = [[], [], []];
+                
+                points.forEach(p => {
+                    let minD = Infinity;
+                    let target = 0;
+                    centroids.forEach((c, i) => {
+                        const d = (p.x - c.x) ** 2 + (p.y - c.y) ** 2;
+                        if (d < minD) { minD = d; target = i; }
+                    });
+                    clusters[target].push(p);
+                });
+
+                centroids = clusters.map((cl, i) => {
+                    if (cl.length === 0) return centroids[i];
+                    const sum = cl.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+                    return { x: sum.x / cl.length, y: sum.y / cl.length };
+                });
+            }
+
+            return centroids;
+        }
+
+        function calculateAngle(a, b, c) {
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) angle = 360.0 - angle;
+            return Math.round(angle);
+        }
+
+        function drawSkeletonLine(p1, p2, color, width) {
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(p1.x, p1.y);
+            canvasCtx.lineTo(p2.x, p2.y);
+            canvasCtx.strokeStyle = color;
+            canvasCtx.lineWidth = width;
+            canvasCtx.stroke();
+        }
+
+        function drawJointPoint(pt, color, radius = 6) {
+            canvasCtx.beginPath();
+            canvasCtx.arc(pt.x, pt.y, radius, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = color;
+            canvasCtx.fill();
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = '#ffffff';
+            canvasCtx.stroke();
+        }
+
+        function drawAngleText(pt, text) {
+            const fontSize = Math.max(16, Math.round(canvasElement.height * 0.035));
+            canvasCtx.font = `bold ${fontSize}px Inter, sans-serif`;
+            canvasCtx.fillStyle = '#ffffff';
+            canvasCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            canvasCtx.shadowBlur = 6;
+            canvasCtx.fillText(text, pt.x + 15, pt.y + 5);
+            canvasCtx.shadowBlur = 0;
+        }
+
+        function updateFeedback(text, borderClass) {
+            const banner = document.getElementById('feedback-banner');
+            banner.className = `bg-slate-800/90 border rounded-2xl p-4 shadow-lg text-center transition-all duration-300 ${borderClass}`;
+            document.getElementById('feedback-text').textContent = text;
+        }
+    </script>
+</body>
+</html>
